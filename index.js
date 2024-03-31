@@ -4,9 +4,9 @@ const cheerio = require("cheerio");
 const app = express();
 const PORT = 8000;
 
-app.use((req, res) => {
-    res.header("Access-Control-Allow-Origin", "*");
-})
+// app.use((req, res) => {
+//     res.header("Access-Control-Allow-Origin", "*");
+// })
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
