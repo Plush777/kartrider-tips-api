@@ -2,10 +2,8 @@ const express = require('express');
 const axios = require("axios");
 const cheerio = require("cheerio");
 const app = express();
-const cors = require('cors');
 const PORT = 8000;
 
-app.use(cors());
 app.use((req, res) => {
     res.header("Access-Control-Allow-Origin", "*");
 })
