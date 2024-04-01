@@ -59,13 +59,8 @@ https://hun-dev.tistory.com/44
 */
 const getSPAHtml = async (url, resource, response, selector) => {
     const browser = await playwright.chromium.launch({ 
-        headless: false ,
-        args: [...chromium.args, "--hide-scrollbars", "--disable-web-security"],
-        defaultViewport: chromium.defaultViewport,
-        executablePath: await chromium.executablePath,
-        headless: true,
-        ignoreHTTPSErrors: true
-    }) 
+        headless: false 
+    });
     const page = await browser.newPage();
     await page.goto(url);
 
@@ -88,8 +83,6 @@ const getSPAHtml = async (url, resource, response, selector) => {
     await browser.close();
     response.json(data);
 }
-
-//s
 
 app.get('/api/coupon/:resource', (req, res) => {
     let { resource } = req.params;
