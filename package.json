@@ -1,10 +1,15 @@
 {
   "description": "",
+  "scripts": {
+    "postinstall": "npx playwright install"
+  },
   "dependencies": {
+    "@sparticuz/chromium": "^123.0.0",
     "axios": "1.6.8",
     "cheerio": "1.0.0-rc.12",
     "cors": "2.8.5",
-    "express": "4.19.2"
+    "express": "4.19.2",
+    "playwright-core": "^1.42.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.42.1",

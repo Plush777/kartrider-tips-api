@@ -5,6 +5,8 @@ const app = express();
 const PORT = 8000;
 const cors = require('cors');
 const playwright = require('playwright');
+// const playwright = require('playwright-core');
+// const chromium = require('@sparticuz/chromium');
 
 app.use(cors());
 
@@ -58,9 +60,13 @@ const getHtml = async (url, resource, response, selector) => {
 https://hun-dev.tistory.com/44
 */
 const getSPAHtml = async (url, resource, response, selector) => {
-    const browser = await playwright.chromium.launch({ 
-        headless: true
-    });
+    // const executablePath = await chromium.executablePath()
+    const browser = await playwright.chromium.launch({
+        // executablePath,
+        headless: true, // use this instead of using chromium.headless because it uses the new `headless: "new"` which will throw because playwright expects `headless: boolean`
+        // args: chromium.args,
+        
+    })
     const page = await browser.newPage();
     await page.goto(url);
 
