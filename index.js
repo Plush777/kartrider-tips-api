@@ -59,7 +59,12 @@ https://hun-dev.tistory.com/44
 */
 const getSPAHtml = async (url, resource, response, selector) => {
     const browser = await playwright.chromium.launch({ 
-        headless: false 
+        headless: false ,
+        args: [...chromium.args, "--hide-scrollbars", "--disable-web-security"],
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath,
+        headless: true,
+        ignoreHTTPSErrors: true
     }) 
     const page = await browser.newPage();
     await page.goto(url);
