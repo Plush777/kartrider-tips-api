@@ -4,7 +4,8 @@ const cheerio = require("cheerio");
 const app = express();
 const PORT = 8000;
 const cors = require('cors');
-const puppeteer = require('puppeteer');
+const playwright = require('playwright');
+
 
 app.use(cors());
 
@@ -58,7 +59,9 @@ const getHtml = async (url, resource, response, selector) => {
 https://hun-dev.tistory.com/44
 */
 const getSPAHtml = async (url, resource, response, selector) => {
-    const browser = await puppeteer.launch();
+    const browser = await playwright.chromium.launch({ 
+        headless: true 
+    }) 
     const page = await browser.newPage();
     await page.goto(url);
 
