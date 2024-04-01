@@ -84,6 +84,7 @@ const getSPAHtml = async (url, resource, response, selector) => {
     response.json(data);
 }
 
+
 app.get('/api/coupon/:resource', (req, res) => {
     let { resource } = req.params;
 
