@@ -56,6 +56,7 @@ const getHtml = async (url, resource, response, selector) => {
     }
 }
 
+
 /* puppeteer 로 크롤링 (spa 사이트일경우) 
 https://hun-dev.tistory.com/44
 */
