@@ -74,7 +74,7 @@ const getSPAHtml = async (url, resource, response, selector) => {
     let data;
 
     switch (resource) {
-        case "plus_box":
+        case "plus_box": 
             data = await page.evaluate(() => {
                 return {
                     title: document.title,
