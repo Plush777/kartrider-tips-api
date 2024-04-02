@@ -23,7 +23,7 @@ const PLUS_BOX_PROB_URL = "https://now.nexon.com/service/kd-live?page=8c36d678-4
  
 /* cheerio로 크롤링 */
 const getHtml = async (url, resource, response, selector) => {
-    try {
+    try { 
         const html = await axios.get(url);
         const $ = cheerio.load(html.data);
 
