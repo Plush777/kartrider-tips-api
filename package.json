@@ -1,15 +1,9 @@
 {
   "description": "",
-  "scripts": {
-    "postinstall": "npx playwright install",
-    "postci": "npx playwright install chromium"
-  },
   "dependencies": {
-    "@playwright/test": "1.36",
     "axios": "1.6.8",
     "cheerio": "1.0.0-rc.12",
     "cors": "2.8.5",
-    "express": "4.19.2",
-    "playwright": "1.36"
+    "express": "4.19.2"
   }
 }
