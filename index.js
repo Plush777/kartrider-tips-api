@@ -5,8 +5,7 @@ const app = express();
 const PORT = 8000;
 const cors = require('cors');
 const playwright = require('playwright');
-// const playwright = require('playwright-core');
-// const chromium = require('@sparticuz/chromium');
+const { chromium } = require('playwright');
 
 app.use(cors());
 
@@ -56,18 +55,11 @@ const getHtml = async (url, resource, response, selector) => {
     }
 }
 
-
-/* puppeteer 로 크롤링 (spa 사이트일경우) 
-https://hun-dev.tistory.com/44
-*/
 const getSPAHtml = async (url, resource, response, selector) => {
-    // const executablePath = await chromium.executablePath()
-    const browser = await playwright.chromium.launch({
-        // executablePath,
-        headless: true, // use this instead of using chromium.headless because it uses the new `headless: "new"` which will throw because playwright expects `headless: boolean`
-        // args: chromium.args,
-         
+    const browser = await chromium.launch({
+        headless: true
     })
+
     const page = await browser.newPage();
     await page.goto(url);
 
