@@ -5,7 +5,6 @@ const app = express();
 const PORT = 8000;
 const cors = require('cors');
 const playwright = require('playwright');
-// const { chromium } = require('playwright');
 
 app.use(cors());
 
@@ -56,7 +55,9 @@ const getHtml = async (url, resource, response, selector) => {
 }
 
 const getSPAHtml = async (url, resource, response, selector) => {
-    const browser = await playwright.chromium.launch(channel="chrome")
+    const browser = await playwright.chromium.launch({
+        headless: true,
+    })
 
     const page = await browser.newPage();
     await page.goto(url);
