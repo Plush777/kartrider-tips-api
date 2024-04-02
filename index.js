@@ -54,7 +54,7 @@ const getHtml = async (url, resource, response, selector) => {
 app.get('/api/coupon/:resource', (req, res) => {
     let { resource } = req.params;
 
-    switch (resource) {
+    switch (resource) { 
         case "news": 
             getHtml(NEWS_COUPON_URL, resource, res, ".board_list ul li");
             break;
