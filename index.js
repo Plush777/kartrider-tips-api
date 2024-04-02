@@ -20,7 +20,7 @@ const NEWS_COUPON_URL = "https://kartdrift.nexon.com/kartdrift/ko/news/announcem
 const CM_EVENT_COUPON_URL = "https://kartdrift.nexon.com/kartdrift/ko/news/communityevent/list?searchKeywordType=THREAD_CONTENT&keywords=%EC%BF%A0%ED%8F%B0";
 /* 카드맆 홈페이지 메뉴 가이드 - 확률정보 => 플러스 박스 카트바디, 캐릭터에 대한 데이터 (나머지 풍선이나 스티커에 대한건 패스) */
 const PLUS_BOX_PROB_URL = "https://now.nexon.com/service/kd-live?page=8c36d678-41cb-4303-b63e-17d66b781071";
-
+ 
 /* cheerio로 크롤링 */
 const getHtml = async (url, resource, response, selector) => {
     try {
