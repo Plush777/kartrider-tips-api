@@ -66,7 +66,7 @@ const getSPAHtml = async (url, resource, response, selector) => {
         // executablePath,
         headless: true, // use this instead of using chromium.headless because it uses the new `headless: "new"` which will throw because playwright expects `headless: boolean`
         // args: chromium.args,
-        
+         
     })
     const page = await browser.newPage();
     await page.goto(url);
