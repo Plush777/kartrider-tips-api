@@ -97,7 +97,7 @@ const getHtml = async (url, resource, response, selector, condition) => {
     }
 };
 
-app.get('/api/coupon/:resource', (req, res) => {
+app.get('/coupon/:resource', (req, res) => {
     let { resource } = req.params;
 
     switch (resource) { 
@@ -113,7 +113,7 @@ app.get('/api/coupon/:resource', (req, res) => {
     }
 });
 
-app.get('/api/article/:resource', (req, res) => {
+app.get('/article/:resource', (req, res) => {
     let { resource } = req.params;
 
     switch (resource) { 
@@ -126,7 +126,7 @@ app.get('/api/article/:resource', (req, res) => {
     }
 });
 
-app.get('/api/kart', (req, res) => {
+app.get('/kart', (req, res) => {
     getHtml(KART_LIST_URL, null, res, ".MsoTableGrid[width]", "kart");
 });
 
@@ -147,7 +147,7 @@ const getChzzk = async (url, response) => {
     }
 }
 
-app.get('/api/chzzk/:info', (req, res) => {
+app.get('/chzzk/:info', (req, res) => {
     let { info } = req.params;
 
     switch (info) { 
