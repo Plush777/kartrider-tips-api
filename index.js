@@ -19,6 +19,8 @@ const CM_EVENT_COUPON_URL = "https://kartdrift.nexon.com/kartdrift/ko/news/commu
 const GUIDE_URL = "https://kartdrift.nexon.com/kartdrift/ko/guide/gameguide/list";
 /* 카트 홈페이지 메뉴 - 가이드 - 카트바디 도감 */
 const KART_LIST_URL = "https://kartdrift.nexon.com/kartdrift/ko/guide/gameguide/view?threadId=2490274";
+/* 치지직에서 카트라이더 드리프트 검색했을 때 라이브 중인 유저 */
+const KART_LIVE_URL = 'https://api.chzzk.naver.com/service/v1/search/lives?keyword=%EC%B9%B4%ED%8A%B8%EB%9D%BC%EC%9D%B4%EB%8D%94%20%EB%93%9C%EB%A6%AC%ED%94%84%ED%8A%B8&offset=0&size=18';
 
 /*
     에러 나는경우
@@ -126,6 +128,36 @@ app.get('/api/article/:resource', (req, res) => {
 
 app.get('/api/kart', (req, res) => {
     getHtml(KART_LIST_URL, null, res, ".MsoTableGrid[width]", "kart");
+});
+
+const getChzzk = async (url, response) => {
+    const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
+    }
+
+    try { 
+        const data = await axios.get(url, {
+            headers: headers
+        });
+
+        response.send(data.data);
+    } catch (error) {
+        console.error(error);
+        response.status(404).json({ error: 'Not Found' });
+    }
+}
+
+app.get('/api/chzzk/:info', (req, res) => {
+    let { info } = req.params;
+
+    switch (info) { 
+        case "live": 
+            getChzzk(KART_LIVE_URL, res);
+            break;
+        default:
+            res.status(404).json({ error: 'Not Found' });
+            break;
+    }
 });
 
 module.exports = app;
