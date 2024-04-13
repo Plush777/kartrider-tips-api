@@ -32,7 +32,7 @@ const KART_LIST_URL = "https://kartdrift.nexon.com/kartdrift/ko/guide/gameguide/
     즉, 전체 개수에서 1씩 뺀다 생각하면 됨.
 
 */
-const KART_LIVE_URL = 'https://api.chzzk.naver.com/service/v1/search/lives?keyword=%EC%B9%B4%ED%8A%B8%EB%9D%BC%EC%9D%B4%EB%8D%94%20%EB%93%9C%EB%A6%AC%ED%94%84%ED%8A%B8';
+const KART_LIVE_URL = `https://api.chzzk.naver.com/service/v1/search/lives?keyword=%EC%B9%B4%ED%8A%B8%EB%9D%BC%EC%9D%B4%EB%8D%94%20%EB%93%9C%EB%A6%AC%ED%94%84%ED%8A%B8`;
 
 /*
     에러 나는경우
@@ -162,9 +162,24 @@ const getChzzk = async (url, response) => {
 app.get('/api/chzzk/:info', (req, res) => {
     let { info } = req.params;
 
+    const chzzkParam = (offset, size) => {
+        return `&offset=${offset}&size=${size}`;
+    }
+
     switch (info) { 
         case "live": 
-            getChzzk(KART_LIVE_URL, res);
+            let offset = 0;
+            let size = 10;    
+        
+            if (req.query.offset) {
+                offset = req.query.offset;
+            }
+
+            if (req.query.size) {
+                size = req.query.size;
+            }
+
+            getChzzk(`${KART_LIVE_URL}${chzzkParam(offset, size)}`, res);
             break;
         default:
             res.status(404).json({ error: 'Not Found' });
