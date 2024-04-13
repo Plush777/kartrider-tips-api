@@ -19,8 +19,20 @@ const CM_EVENT_COUPON_URL = "https://kartdrift.nexon.com/kartdrift/ko/news/commu
 const GUIDE_URL = "https://kartdrift.nexon.com/kartdrift/ko/guide/gameguide/list";
 /* 카트 홈페이지 메뉴 - 가이드 - 카트바디 도감 */
 const KART_LIST_URL = "https://kartdrift.nexon.com/kartdrift/ko/guide/gameguide/view?threadId=2490274";
-/* 치지직에서 카트라이더 드리프트 검색했을 때 라이브 중인 유저 */
-const KART_LIVE_URL = 'https://api.chzzk.naver.com/service/v1/search/lives?keyword=%EC%B9%B4%ED%8A%B8%EB%9D%BC%EC%9D%B4%EB%8D%94%20%EB%93%9C%EB%A6%AC%ED%94%84%ED%8A%B8&offset=0&size=18';
+/* 
+    https://blog.ssogari.dev/25
+    치지직에서 카트라이더 드리프트 검색했을 때 라이브 중인 유저 
+
+    size: 반환할 결과의 수
+    offset: 결과 목록의 시작점. (기본은 0부터 시작)
+    ex) 전체 결과 개수가 10개라고 했을 때, 
+    offset=1 => 9개의 결과만 가져옴
+    offset=9 => 1개의 결과만 가져옴
+
+    즉, 전체 개수에서 1씩 뺀다 생각하면 됨.
+
+*/
+const KART_LIVE_URL = 'https://api.chzzk.naver.com/service/v1/search/lives?keyword=%EC%B9%B4%ED%8A%B8%EB%9D%BC%EC%9D%B4%EB%8D%94%20%EB%93%9C%EB%A6%AC%ED%94%84%ED%8A%B8';
 
 /*
     에러 나는경우
