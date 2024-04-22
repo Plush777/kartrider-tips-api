@@ -59,9 +59,16 @@ const getHtml = async (url, resource, response, selector, condition) => {
         let $bodyList = $(selector);
 
         if (condition === 'kartdrift') {
-            $bodyList.each(function (i) {
+            $bodyList.each(function (i, item) {
                 switch (resource) {
                     case "news":
+                        object = {
+                            title: $(this).find('.tit span').text(),
+                            date: $(this).find('.info .date').text(),
+                            view: $(this).find('.view').text()
+                        }
+        
+                        break;
                     case "guide":
                     case "cm_event":
                     case "dev":
@@ -69,9 +76,10 @@ const getHtml = async (url, resource, response, selector, condition) => {
                         object = {
                             title: $(this).find('.tit span').text(),
                             date: $(this).find('.info .date').text(),
-                            view: $(this).find('.view').text()
+                            view: $(this).find('.view').text(),
+                            url: $(this).find('a').attr('href')
                         }
-        
+
                         break;
                     default:
                         break;
