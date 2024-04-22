@@ -21,7 +21,10 @@ const GUIDE_URL = "https://kartdrift.nexon.com/kartdrift/ko/guide/gameguide/list
 const KART_LIST_URL = "https://kartdrift.nexon.com/kartdrift/ko/guide/gameguide/view?threadId=2490274";
 /* 치지직에서 카트라이더 드리프트 검색했을 때 라이브 중인 유저 */
 const KART_LIVE_URL = 'https://api.chzzk.naver.com/service/v1/search/lives?keyword=%EC%B9%B4%ED%8A%B8%EB%9D%BC%EC%9D%B4%EB%8D%94%20%EB%93%9C%EB%A6%AC%ED%94%84%ED%8A%B8&offset=0&size=18';
-
+/* 카트 개발자노트 게시글 */
+const DEV_NOTE_URL = "https://kartdrift.nexon.com/kartdrift/ko/news/announcement/list?searchKeywordType=THREAD_TITLE&keywords=%EA%B0%9C%EB%B0%9C%EC%9E%90%EB%85%B8%ED%8A%B8"
+/* 카트 업데이트 게시글 */
+const UPDATE_URL = "https://kartdrift.nexon.com/kartdrift/ko/news/update/list"
 /*
     에러 나는경우
 
@@ -46,6 +49,8 @@ const getHtml = async (url, resource, response, selector, condition) => {
                     case "news":
                     case "guide":
                     case "cm_event":
+                    case "dev":
+                    case "update":
                         object = {
                             title: $(this).find('.tit span').text(),
                             date: $(this).find('.info .date').text(),
@@ -119,6 +124,12 @@ app.get('/api/article/:resource', (req, res) => {
     switch (resource) { 
         case "guide": 
             getHtml(GUIDE_URL, resource, res, ".board_list ul li", "kartdrift");
+            break;
+        case "dev":
+            getHtml(DEV_NOTE_URL, resource, res, ".board_list ul li", "kartdrift");
+            break;
+        case "update":
+            getHtml(UPDATE_URL, resource, res, ".board_list ul li", "kartdrift");
             break;
         default:
             res.status(404).json({ error: 'Not Found' });
