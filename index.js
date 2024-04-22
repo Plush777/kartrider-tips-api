@@ -77,7 +77,7 @@ const getHtml = async (url, resource, response, selector, condition) => {
                             title: $(this).find('.tit span').text(),
                             date: $(this).find('.info .date').text(),
                             view: $(this).find('.view').text(),
-                            url: $(this).find('a').attr('href')
+                            url: `https://kartdrift.nexon.com${$(this).find('a').attr('href')}`
                         }
 
                         break;
