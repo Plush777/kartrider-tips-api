@@ -130,10 +130,10 @@ app.get('/api/coupon/:resource', (req, res) => {
 
     switch (resource) { 
         case "news": 
-            getHtml(NEWS_COUPON_URL, resource, res, ".board_list ul li", "kartdrift");
+            getHtml(NEWS_COUPON_URL, resource, res, ".board_list:not(.notice) ul li", "kartdrift");
             break;
         case "cm_event":
-            getHtml(CM_EVENT_COUPON_URL, resource, res, ".board_list ul li", "kartdrift");
+            getHtml(CM_EVENT_COUPON_URL, resource, res, ".board_list:not(.notice) ul li", "kartdrift");
             break;
         default:
             res.status(404).json({ error: 'Not Found' });
@@ -146,13 +146,13 @@ app.get('/api/article/:resource', (req, res) => {
 
     switch (resource) { 
         case "guide": 
-            getHtml(GUIDE_URL, resource, res, ".board_list ul li", "kartdrift");
+            getHtml(GUIDE_URL, resource, res, ".board_list:not(.notice) ul li", "kartdrift");
             break;
         case "dev":
-            getHtml(DEV_NOTE_URL, resource, res, ".board_list ul li", "kartdrift");
+            getHtml(DEV_NOTE_URL, resource, res, ".board_list:not(.notice) ul li", "kartdrift");
             break;
         case "update":
-            getHtml(UPDATE_URL, resource, res, ".board_list ul li", "kartdrift");
+            getHtml(UPDATE_URL, resource, res, ".board_list:not(.notice) ul li", "kartdrift");
             break;
         default:
             res.status(404).json({ error: 'Not Found' });
