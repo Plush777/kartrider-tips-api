@@ -115,7 +115,8 @@ const getHtml = async (url, resource, response, selector, condition) => {
                     title: $(this).find('.game-name a').text(),
                     rankChange: $(this).find('.rankChange').text(),
                     rankStatus: $(this).find('.rankChange > span').attr('class'),
-                    rank: $(this).find('.rank').text()
+                    rank: $(this).find('.rank').text(),
+                    img: $(this).find('.game-icon').attr('src')
                 }
 
                 list[i] = object;
