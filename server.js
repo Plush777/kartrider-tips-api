@@ -4,6 +4,7 @@ const cheerio = require("cheerio");
 const app = express();
 const PORT = 8000;
 const cors = require('cors');
+const puppeteer = require('puppeteer');
 
 app.use(cors());
 
@@ -25,6 +26,8 @@ const DEV_NOTE_URL = "https://kartdrift.nexon.com/kartdrift/ko/news/announcement
 const UPDATE_URL = "https://kartdrift.nexon.com/kartdrift/ko/news/update/list";
 /* 게임 순위 */
 const RANKING_URL = "https://www.gamemeca.com/ranking.php";
+/* PC방 게임순위 (더로그) */
+const THE_LOG_RANKING_URL = "https://www.thelog.co.kr/api/service/gameRank.do?page=1&gameType=&targetDate=20240513&gameDataType=S&moreBtnOption=false";
 
 /* 
     https://blog.ssogari.dev/25
@@ -130,6 +133,42 @@ const getHtml = async (url, resource, response, selector, condition) => {
     }
 };
 
+const crawl = async (response) => {
+    const browser = await puppeteer.launch({
+        headless: false
+    });
+    const page = await browser.newPage();
+    const myId = 'sky11916';
+    const myPw = '!sky7601';
+
+    await page.goto('https://www.thelog.co.kr/member/loginForm.do?returnUrl=http://www.thelog.co.kr/stats/gameStats.do');
+    
+    //#loginId에 포커스를 준다.
+    await page.focus('#loginId');
+    //키보드로 아이디를 입력한다.
+    await page.keyboard.type(myId);
+    //포커스를 #loginPasswd로 이동한다.
+    await page.focus('#loginPasswd');
+    //키보드로 비밀번호를 입력한다.
+    await page.keyboard.type(myPw);
+
+    await page.click('input.btn_login');
+    await page.waitForNavigation();
+    
+    if (page.url() === 'https://www.thelog.co.kr/stats/gameStats.do') {
+        await page.goto('https://www.thelog.co.kr/api/service/gameRank.do?page=1&gameType=&targetDate=20240513&gameDataType=S&moreBtnOption=false');
+
+        response.send(await page.content());
+    } else {
+        alert('로그인 실패');
+        myId = undefined;
+        myPw = undefined;
+    }
+
+    await browser.close();
+}
+
+
 app.get('/api/coupon/:resource', (req, res) => {
     let { resource } = req.params;
 
@@ -215,7 +254,8 @@ app.get('/api/chzzk/:info', (req, res) => {
 });
 
 app.get('/api/ranking', (req, res) => {
-    getHtml(RANKING_URL, null, res, ".ranking-table tbody .ranking-table-rows", "ranking");
+    // getHtml(RANKING_URL, null, res, ".ranking-table tbody .ranking-table-rows", "ranking");
+    crawl(res);
 });
 
 module.exports = app;
