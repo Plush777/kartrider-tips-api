@@ -25,8 +25,6 @@ const DEV_NOTE_URL = "https://kartdrift.nexon.com/kartdrift/ko/news/announcement
 /* 카트 업데이트 게시글 */
 const UPDATE_URL = "https://kartdrift.nexon.com/kartdrift/ko/news/update/list";
 
-
-
 /* 
     https://blog.ssogari.dev/25
     치지직에서 카트라이더 드리프트 검색했을 때 라이브 중인 유저 
@@ -41,9 +39,6 @@ const UPDATE_URL = "https://kartdrift.nexon.com/kartdrift/ko/news/update/list";
 
 */
 const KART_LIVE_URL = `https://api.chzzk.naver.com/service/v1/search/lives?keyword=%EC%B9%B4%ED%8A%B8%EB%9D%BC%EC%9D%B4%EB%8D%94%20%EB%93%9C%EB%A6%AC%ED%94%84%ED%8A%B8`;
-
-/* 더로그 게임 통계 홈 url */
-const THE_LOG_GAME_STATS_HOME_URL = "https://www.thelog.co.kr/stats/gameStats.do";
 
 const getHtml = async (url, resource, response, selector, condition) => {
     try { 
@@ -286,10 +281,7 @@ const getGameStatsData = async (response) => {
 
         response.send(result);
     } 
-    
-    await browser.close();
 }
-
 
 app.get('/api/coupon/:resource', (req, res) => {
     let { resource } = req.params;
