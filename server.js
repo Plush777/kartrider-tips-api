@@ -4,6 +4,7 @@ const cheerio = require("cheerio");
 const app = express();
 const PORT = 8000;
 const cors = require('cors');
+const puppeteer = require('puppeteer');
 
 app.use(cors());
 
@@ -23,8 +24,8 @@ const KART_LIST_URL = "https://kartdrift.nexon.com/kartdrift/ko/guide/gameguide/
 const DEV_NOTE_URL = "https://kartdrift.nexon.com/kartdrift/ko/news/announcement/list?searchKeywordType=THREAD_TITLE&keywords=%EA%B0%9C%EB%B0%9C%EC%9E%90%EB%85%B8%ED%8A%B8"
 /* 카트 업데이트 게시글 */
 const UPDATE_URL = "https://kartdrift.nexon.com/kartdrift/ko/news/update/list";
-/* 게임 순위 */
-const RANKING_URL = "https://www.gamemeca.com/ranking.php";
+
+
 
 /* 
     https://blog.ssogari.dev/25
@@ -41,15 +42,8 @@ const RANKING_URL = "https://www.gamemeca.com/ranking.php";
 */
 const KART_LIVE_URL = `https://api.chzzk.naver.com/service/v1/search/lives?keyword=%EC%B9%B4%ED%8A%B8%EB%9D%BC%EC%9D%B4%EB%8D%94%20%EB%93%9C%EB%A6%AC%ED%94%84%ED%8A%B8`;
 
-
-/*
-    에러 나는경우
-
-    1. url이 잘못되거나 해당 페이지가 사라짐
-    2. 넥슨 홈페이지가 점검 중임 (매주 목요일)
-    3. 해당 페이지의 html 구조가 변경되거나 클래스가 변경된 경우
-
-*/
+/* 더로그 게임 통계 홈 url */
+const THE_LOG_GAME_STATS_HOME_URL = "https://www.thelog.co.kr/stats/gameStats.do";
 
 const getHtml = async (url, resource, response, selector, condition) => {
     try { 
@@ -91,20 +85,82 @@ const getHtml = async (url, resource, response, selector, condition) => {
             });
         } else if (condition === 'kart') {
             $bodyList.each(function (i, item) {
-                let kartNames = $(this).find('tr td[style*="background-color:black"] span[style*="letter-spacing:-1.0pt"]').text();
+                let kartArray = [];
 
-                let kartNamePrefix = kartNames.split(/\[일반\]|\[희귀\]|\[고급\]|\[영웅\]|\[전설\]/);
-                let kartNameSplitArray = kartNamePrefix.filter((name) => name.trim() !== "");
-                let kartNameTrimmedArray = kartNameSplitArray.map((name) => name.replace(/^ /, ''));
-              
-                const kartTypeSelector = 'tr td[style*="background-color:#9a68f4"] span[style*="letter-spacing:-1.0pt"], tr td[style*="background-color:#ee6060"] span[style*="letter-spacing:-1.0pt"], tr td[style*="background-color:#6b72fb"] span[style*="letter-spacing:-1.0pt"]'
+                $(this).find('tr td[style*="background-color:black"] span[style*="letter-spacing:-1.0pt"]').each(function (i, item) {
+                    kartArray.push($(this).text());
+                });
+
+                const kartArrayJoin = kartArray.join('');
+
+                function extractItemsFromArray(str) {
+                    const regex = /\[[^\]]+\]\s*[^[]*/g;
+                    let results = str.match(regex) || [];
+                    return results;
+                }
                 
-                let kartTypes = $(this).find(kartTypeSelector).text();
-                let kartTypeStringMatchArray = kartTypes.match(/밸런스형|속도형|드리프트형/g);
+                const extractedItems = extractItemsFromArray(kartArrayJoin);
+                
+                const kartTypeSelector = 'tr td[style*="background-color:#9a68f4"] span[style*="letter-spacing"], tr td[style*="background-color: rgb(154, 104, 244)"] span[style*="letter-spacing"], tr td[style*="background-color:#ee6060"] span[style*="letter-spacing"], tr td[style*="background-color:#6b72fb"] span[style*="letter-spacing"]'
+                /* 
+                    240630 주의사항 추가 
+                    밸런스형 텍스트들의 background-color는 #9a68f4로 다 되어있는데,
+                    스펙터만 혼자 rgb(154, 104, 244) 로 되어있어서 1개 누락되는 부분이 있으므로 rgb도 잘 봐야하고,
+                    셀렉터 띄어쓰기도 잘 되어있는지 확인해야 함.
+                */
+                let kartTypeArray = [];
+
+                $(this).find(kartTypeSelector).each(function(index) {
+                    let text = $(this).text();
+                    let matches = text.match(/밸런스형|속도형|드리프트형/g);
+                    if (matches) {
+                        kartTypeArray.push(...matches);
+                    }
+                });
+
+                let imgArray = [];
+
+                $(this).find('tr td img').each(function (i, item) {
+                    // console.log(item.attribs.src);
+
+                    imgArray[i] = item.attribs.src;
+                });
+
+                let statArray = [];
+
+                $(this).find('tr td:not([style*="background-color"]) span[style*="letter-spacing"]').each(function (i, item) {
+                    /* 정규식으로 0 ~ 9까지의 숫자만 가져옵니다. */
+                    let match = $(this).text().match(/\d+/g);
+
+                    /* 
+                        null값이 아닌 값만 statArray에 넣는데
+                        이 때, 값들은 문자열이기 때문에
+                        map 메서드로 한번에 모든 값들을 숫자로 바꿉니다.
+                    */
+                    if (match !== null) {
+                        statArray.push(...match.map(Number)); 
+                    }
+                });
+
+                /* 
+                    카트바디 1개 당 수치는 총 4개이기 때문에,
+                    for 문으로 statArray에 있는 모든 값들을 반복하면서
+                    slice 메서드로 4개씩 자릅니다.
+
+                    자른 값들을 결과값 저장하는 배열 안에 객체로 하나씩 각각 넣어줍니다.
+                */
+                let statResultArray = [];
+
+                for (let i = 0; i < statArray.length; i += 4) {
+                    let sliceItem = statArray.slice(i, i + 4); 
+                    statResultArray.push({ array: sliceItem });
+                }
 
                 object = {
-                    name: kartNameTrimmedArray,
-                    type: kartTypeStringMatchArray
+                    name: extractedItems,
+                    type: kartTypeArray,
+                    imgs: imgArray,
+                    stats: statResultArray
                 }
                 
                 list[i] = object;
@@ -129,6 +185,111 @@ const getHtml = async (url, resource, response, selector, condition) => {
         response.status(500).json({ error: 'Internal Server Error' });
     }
 };
+
+const getGameImage = async (response, gameName) => {
+    const browser = await puppeteer.launch({
+        headless: false
+    });
+   
+    const page = await browser.newPage();
+
+    await page.goto('https://www.google.com');
+
+    await page.focus('textarea[name="q"]');
+    await page.keyboard.type(`${gameName} 로고`);
+
+    await page.keyboard.press('Enter');
+
+    await page.waitForSelector('#search img[data-atf]');
+
+    const data = await page.evaluate(() => {
+        return {
+            src: document.querySelector('#search img[data-atf]').src,
+            alt: document.querySelector('#search img[data-atf]').alt
+        }
+    });
+
+    response.send(data);
+
+    await browser.close();
+}
+
+const getGameStatsData = async (response) => {
+    const browser = await puppeteer.launch({
+        headless: false
+    });
+   
+    const page = await browser.newPage();
+
+    const myId = 'sky11916';
+    const myPw = '!sky7601';
+   
+    await page.goto('https://www.thelog.co.kr/index.do');
+
+    const isLoggedIn = await page.evaluate(() => {
+        return !!document.querySelector('.gnb_home .logout_btn');
+    });
+    
+    if (!isLoggedIn) {
+        await page.click('.login_btn');
+        await page.waitForSelector('#loginId', { visible: true }); // Wait for the login form to appear
+        await page.focus('#loginId');
+        await page.keyboard.type(myId);
+        await page.focus('#loginPasswd');
+        await page.keyboard.type(myPw);
+
+        await page.click('input.btn_login');
+        await page.waitForNavigation();
+
+        if (page.url() !== 'https://www.thelog.co.kr/stats/gameStats.do') {
+            console.error('로그인 실패');
+            await browser.close();
+            return;
+        }
+    } else {
+        console.log('이미 로그인되어 있습니다.');
+        await page.goto('https://www.thelog.co.kr/stats/gameStats.do');
+    }
+
+    
+
+    /* 로그인에 성공했을 때 */
+    if (page.url() === 'https://www.thelog.co.kr/stats/gameStats.do') {
+        let date;
+
+        await page.click('a[href="/stats/rank/GameRankDetail.do"]');
+        await page.click('.gtab_wrap .g_tab.sample a[onclick="tabConfig.btnAll();"]');
+
+        //input id targetDate의 value 값을 가져와서 . 을 제거한 후 date 변수에 저장
+        date = await page.evaluate(() => {
+            return document.getElementById('targetDate').value.replace(/\./g, '');
+        });
+        await page.goto(`https://www.thelog.co.kr/api/service/gameRank.do?page=1&targetDate=${date}&gameDataType=A&moreBtnOption=false`);
+
+        const data = await page.evaluate(() => document.querySelector('pre').textContent);
+
+        const jsonData = JSON.parse(data);
+        
+        const gameRanks = jsonData.gameRanks.slice(0, 50);
+
+        const result = gameRanks.map((game) => {
+            return {
+                title: game.gameName,
+                rank: game.gameRank,
+                gameRankUpDown: game.gameRankUpDown,
+                shares: game.gameShares,
+                sharesUpDown: String(game.sharesUpDown),
+                sharesStatus: String(game.sharesUpDown).includes('-') ? 'down' : 'up',
+                useStoreCount: game.useStoreCount,
+            };
+        });
+
+        response.send(result);
+    } 
+    
+    await browser.close();
+}
+
 
 app.get('/api/coupon/:resource', (req, res) => {
     let { resource } = req.params;
@@ -215,7 +376,13 @@ app.get('/api/chzzk/:info', (req, res) => {
 });
 
 app.get('/api/ranking', (req, res) => {
-    getHtml(RANKING_URL, null, res, ".ranking-table tbody .ranking-table-rows", "ranking");
+    getGameStatsData(res);
+});
+
+app.get('/api/game/image/:gameName', (req, res) => {
+    let { gameName } = req.params;
+
+    getGameImage(res, gameName);
 });
 
 module.exports = app;
