@@ -94,20 +94,82 @@ const getHtml = async (url, resource, response, selector, condition) => {
             });
         } else if (condition === 'kart') {
             $bodyList.each(function (i, item) {
-                let kartNames = $(this).find('tr td[style*="background-color:black"] span[style*="letter-spacing:-1.0pt"]').text();
+                let kartArray = [];
 
-                let kartNamePrefix = kartNames.split(/\[일반\]|\[희귀\]|\[고급\]|\[영웅\]|\[전설\]/);
-                let kartNameSplitArray = kartNamePrefix.filter((name) => name.trim() !== "");
-                let kartNameTrimmedArray = kartNameSplitArray.map((name) => name.replace(/^ /, ''));
-              
-                const kartTypeSelector = 'tr td[style*="background-color:#9a68f4"] span[style*="letter-spacing:-1.0pt"], tr td[style*="background-color:#ee6060"] span[style*="letter-spacing:-1.0pt"], tr td[style*="background-color:#6b72fb"] span[style*="letter-spacing:-1.0pt"]'
+                $(this).find('tr td[style*="background-color:black"] span[style*="letter-spacing:-1.0pt"]').each(function (i, item) {
+                    kartArray.push($(this).text());
+                });
+
+                const kartArrayJoin = kartArray.join('');
+
+                function extractItemsFromArray(str) {
+                    const regex = /\[[^\]]+\]\s*[^[]*/g;
+                    let results = str.match(regex) || [];
+                    return results;
+                }
                 
-                let kartTypes = $(this).find(kartTypeSelector).text();
-                let kartTypeStringMatchArray = kartTypes.match(/밸런스형|속도형|드리프트형/g);
+                const extractedItems = extractItemsFromArray(kartArrayJoin);
+                
+                const kartTypeSelector = 'tr td[style*="background-color:#9a68f4"] span[style*="letter-spacing"], tr td[style*="background-color: rgb(154, 104, 244)"] span[style*="letter-spacing"], tr td[style*="background-color:#ee6060"] span[style*="letter-spacing"], tr td[style*="background-color:#6b72fb"] span[style*="letter-spacing"]'
+                /* 
+                    240630 주의사항 추가 
+                    밸런스형 텍스트들의 background-color는 #9a68f4로 다 되어있는데,
+                    스펙터만 혼자 rgb(154, 104, 244) 로 되어있어서 1개 누락되는 부분이 있으므로 rgb도 잘 봐야하고,
+                    셀렉터 띄어쓰기도 잘 되어있는지 확인해야 함.
+                */
+                let kartTypeArray = [];
+
+                $(this).find(kartTypeSelector).each(function(index) {
+                    let text = $(this).text();
+                    let matches = text.match(/밸런스형|속도형|드리프트형/g);
+                    if (matches) {
+                        kartTypeArray.push(...matches);
+                    }
+                });
+
+                let imgArray = [];
+
+                $(this).find('tr td img').each(function (i, item) {
+                    // console.log(item.attribs.src);
+
+                    imgArray[i] = item.attribs.src;
+                });
+
+                let statArray = [];
+
+                $(this).find('tr td:not([style*="background-color"]) span[style*="letter-spacing"]').each(function (i, item) {
+                    /* 정규식으로 0 ~ 9까지의 숫자만 가져옵니다. */
+                    let match = $(this).text().match(/\d+/g);
+
+                    /* 
+                        null값이 아닌 값만 statArray에 넣는데
+                        이 때, 값들은 문자열이기 때문에
+                        map 메서드로 한번에 모든 값들을 숫자로 바꿉니다.
+                    */
+                    if (match !== null) {
+                        statArray.push(...match.map(Number)); 
+                    }
+                });
+
+                /* 
+                    카트바디 1개 당 수치는 총 4개이기 때문에,
+                    for 문으로 statArray에 있는 모든 값들을 반복하면서
+                    slice 메서드로 4개씩 자릅니다.
+
+                    자른 값들을 결과값 저장하는 배열 안에 객체로 하나씩 각각 넣어줍니다.
+                */
+                let statResultArray = [];
+
+                for (let i = 0; i < statArray.length; i += 4) {
+                    let sliceItem = statArray.slice(i, i + 4); 
+                    statResultArray.push({ array: sliceItem });
+                }
 
                 object = {
-                    name: kartNameTrimmedArray,
-                    type: kartTypeStringMatchArray
+                    name: extractedItems,
+                    type: kartTypeArray,
+                    imgs: imgArray,
+                    stats: statResultArray
                 }
                 
                 list[i] = object;
