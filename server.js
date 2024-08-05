@@ -24,10 +24,6 @@ const KART_LIST_URL = "https://kartdrift.nexon.com/kartdrift/ko/guide/gameguide/
 const DEV_NOTE_URL = "https://kartdrift.nexon.com/kartdrift/ko/news/announcement/list?searchKeywordType=THREAD_TITLE&keywords=%EA%B0%9C%EB%B0%9C%EC%9E%90%EB%85%B8%ED%8A%B8"
 /* 카트 업데이트 게시글 */
 const UPDATE_URL = "https://kartdrift.nexon.com/kartdrift/ko/news/update/list";
-/* 게임 순위 */
-const RANKING_URL = "https://www.gamemeca.com/ranking.php";
-/* PC방 게임순위 (더로그) */
-const THE_LOG_RANKING_URL = "https://www.thelog.co.kr/api/service/gameRank.do?page=1&gameType=&targetDate=20240513&gameDataType=S&moreBtnOption=false";
 
 /* 
     https://blog.ssogari.dev/25
@@ -43,16 +39,6 @@ const THE_LOG_RANKING_URL = "https://www.thelog.co.kr/api/service/gameRank.do?pa
 
 */
 const KART_LIVE_URL = `https://api.chzzk.naver.com/service/v1/search/lives?keyword=%EC%B9%B4%ED%8A%B8%EB%9D%BC%EC%9D%B4%EB%8D%94%20%EB%93%9C%EB%A6%AC%ED%94%84%ED%8A%B8`;
-
-
-/*
-    에러 나는경우
-
-    1. url이 잘못되거나 해당 페이지가 사라짐
-    2. 넥슨 홈페이지가 점검 중임 (매주 목요일)
-    3. 해당 페이지의 html 구조가 변경되거나 클래스가 변경된 경우
-
-*/
 
 const getHtml = async (url, resource, response, selector, condition) => {
     try { 
@@ -195,41 +181,107 @@ const getHtml = async (url, resource, response, selector, condition) => {
     }
 };
 
-const crawl = async (response) => {
+const getGameImage = async (response, gameName) => {
     const browser = await puppeteer.launch({
         headless: false
     });
+   
     const page = await browser.newPage();
-    const myId = 'sky11916';
-    const myPw = '!sky7601';
 
-    await page.goto('https://www.thelog.co.kr/member/loginForm.do?returnUrl=http://www.thelog.co.kr/stats/gameStats.do');
-    
-    //#loginId에 포커스를 준다.
-    await page.focus('#loginId');
-    //키보드로 아이디를 입력한다.
-    await page.keyboard.type(myId);
-    //포커스를 #loginPasswd로 이동한다.
-    await page.focus('#loginPasswd');
-    //키보드로 비밀번호를 입력한다.
-    await page.keyboard.type(myPw);
+    await page.goto('https://www.google.com');
 
-    await page.click('input.btn_login');
-    await page.waitForNavigation();
-    
-    if (page.url() === 'https://www.thelog.co.kr/stats/gameStats.do') {
-        await page.goto('https://www.thelog.co.kr/api/service/gameRank.do?page=1&gameType=&targetDate=20240513&gameDataType=S&moreBtnOption=false');
+    await page.focus('textarea[name="q"]');
+    await page.keyboard.type(`${gameName} 로고`);
 
-        response.send(await page.content());
-    } else {
-        alert('로그인 실패');
-        myId = undefined;
-        myPw = undefined;
-    }
+    await page.keyboard.press('Enter');
+
+    await page.waitForSelector('#search img[data-atf]');
+
+    const data = await page.evaluate(() => {
+        return {
+            src: document.querySelector('#search img[data-atf]').src,
+            alt: document.querySelector('#search img[data-atf]').alt
+        }
+    });
+
+    response.send(data);
 
     await browser.close();
 }
 
+const getGameStatsData = async (response) => {
+    const browser = await puppeteer.launch({
+        headless: false
+    });
+   
+    const page = await browser.newPage();
+
+    const myId = 'sky11916';
+    const myPw = '!sky7601';
+   
+    await page.goto('https://www.thelog.co.kr/index.do');
+
+    const isLoggedIn = await page.evaluate(() => {
+        return !!document.querySelector('.gnb_home .logout_btn');
+    });
+    
+    if (!isLoggedIn) {
+        await page.click('.login_btn');
+        await page.waitForSelector('#loginId', { visible: true }); // Wait for the login form to appear
+        await page.focus('#loginId');
+        await page.keyboard.type(myId);
+        await page.focus('#loginPasswd');
+        await page.keyboard.type(myPw);
+
+        await page.click('input.btn_login');
+        await page.waitForNavigation();
+
+        if (page.url() !== 'https://www.thelog.co.kr/stats/gameStats.do') {
+            console.error('로그인 실패');
+            await browser.close();
+            return;
+        }
+    } else {
+        console.log('이미 로그인되어 있습니다.');
+        await page.goto('https://www.thelog.co.kr/stats/gameStats.do');
+    }
+
+    
+
+    /* 로그인에 성공했을 때 */
+    if (page.url() === 'https://www.thelog.co.kr/stats/gameStats.do') {
+        let date;
+
+        await page.click('a[href="/stats/rank/GameRankDetail.do"]');
+        await page.click('.gtab_wrap .g_tab.sample a[onclick="tabConfig.btnAll();"]');
+
+        //input id targetDate의 value 값을 가져와서 . 을 제거한 후 date 변수에 저장
+        date = await page.evaluate(() => {
+            return document.getElementById('targetDate').value.replace(/\./g, '');
+        });
+        await page.goto(`https://www.thelog.co.kr/api/service/gameRank.do?page=1&targetDate=${date}&gameDataType=A&moreBtnOption=false`);
+
+        const data = await page.evaluate(() => document.querySelector('pre').textContent);
+
+        const jsonData = JSON.parse(data);
+        
+        const gameRanks = jsonData.gameRanks.slice(0, 50);
+
+        const result = gameRanks.map((game) => {
+            return {
+                title: game.gameName,
+                rank: game.gameRank,
+                gameRankUpDown: game.gameRankUpDown,
+                shares: game.gameShares,
+                sharesUpDown: String(game.sharesUpDown),
+                sharesStatus: String(game.sharesUpDown).includes('-') ? 'down' : 'up',
+                useStoreCount: game.useStoreCount,
+            };
+        });
+
+        response.send(result);
+    } 
+}
 
 app.get('/api/coupon/:resource', (req, res) => {
     let { resource } = req.params;
@@ -316,8 +368,13 @@ app.get('/api/chzzk/:info', (req, res) => {
 });
 
 app.get('/api/ranking', (req, res) => {
-    // getHtml(RANKING_URL, null, res, ".ranking-table tbody .ranking-table-rows", "ranking");
-    crawl(res);
+    getGameStatsData(res);
+});
+
+app.get('/api/game/image/:gameName', (req, res) => {
+    let { gameName } = req.params;
+
+    getGameImage(res, gameName);
 });
 
 module.exports = app;
