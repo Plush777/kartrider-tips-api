@@ -5,12 +5,15 @@ const app = express();
 const PORT = 8000;
 const cors = require('cors');
 const puppeteer = require('puppeteer');
+const LRU = require('lru-cache');
 
 app.use(cors());
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
+
+const dataCache = new LRU({ max: 1, ttl: 1000 * 60 * 60 }); // 게임 데이터 캐시, 1시간 TTL
 
 /* 공지사항에서 제목 검색 => 쿠폰에 대한 데이터 */
 const NEWS_COUPON_URL = "https://kartdrift.nexon.com/kartdrift/ko/news/announcement/list?searchKeywordType=THREAD_TITLE&keywords=%EC%BF%A0%ED%8F%B0";
@@ -39,6 +42,25 @@ const UPDATE_URL = "https://kartdrift.nexon.com/kartdrift/ko/news/update/list";
 
 */
 const KART_LIVE_URL = `https://api.chzzk.naver.com/service/v1/search/lives?keyword=%EC%B9%B4%ED%8A%B8%EB%9D%BC%EC%9D%B4%EB%8D%94%20%EB%93%9C%EB%A6%AC%ED%94%84%ED%8A%B8`;
+
+const blockResource = (page) => {
+    page.setRequestInterception(true);
+    page.on('request', (req) => {
+        const resourceType = req.resourceType();
+        if (['stylesheet', 'font'].includes(resourceType)) {
+            req.abort();
+        } else {
+            req.continue();
+        }
+    });
+}
+
+const sharesUpDownCondition = (gameRankUpDown) => {
+    if (gameRankUpDown > 0) return 'up';
+    if (gameRankUpDown < 0) return 'down';
+    if (gameRankUpDown === 0) return 'noChange';
+    return undefined;
+}
 
 const getHtml = async (url, resource, response, selector, condition) => {
     try { 
@@ -181,107 +203,76 @@ const getHtml = async (url, resource, response, selector, condition) => {
     }
 };
 
-const getGameImage = async (response, gameName) => {
-    const browser = await puppeteer.launch({
-        headless: false
-    });
-   
+const getGameStatsData = async () => {
+    const browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
 
-    await page.goto('https://www.google.com');
-
-    await page.focus('textarea[name="q"]');
-    await page.keyboard.type(`${gameName} 로고`);
-
-    await page.keyboard.press('Enter');
-
-    await page.waitForSelector('#search img[data-atf]');
-
-    const data = await page.evaluate(() => {
-        return {
-            src: document.querySelector('#search img[data-atf]').src,
-            alt: document.querySelector('#search img[data-atf]').alt
-        }
-    });
-
-    response.send(data);
-
-    await browser.close();
-}
-
-const getGameStatsData = async (response) => {
-    const browser = await puppeteer.launch({
-        headless: false
-    });
-   
-    const page = await browser.newPage();
+    blockResource(page);
 
     const myId = 'sky11916';
     const myPw = '!sky7601';
-   
+
     await page.goto('https://www.thelog.co.kr/index.do');
 
     const isLoggedIn = await page.evaluate(() => {
         return !!document.querySelector('.gnb_home .logout_btn');
     });
-    
+
     if (!isLoggedIn) {
         await page.click('.login_btn');
-        await page.waitForSelector('#loginId', { visible: true }); // Wait for the login form to appear
+        await page.waitForSelector('#loginId', { visible: true });
         await page.focus('#loginId');
         await page.keyboard.type(myId);
         await page.focus('#loginPasswd');
         await page.keyboard.type(myPw);
 
         await page.click('input.btn_login');
-        await page.waitForNavigation();
+        await page.waitForNavigation({ waitUntil: 'networkidle0' });
 
         if (page.url() !== 'https://www.thelog.co.kr/stats/gameStats.do') {
             console.error('로그인 실패');
             await browser.close();
-            return;
+            return [];
         }
     } else {
-        console.log('이미 로그인되어 있습니다.');
         await page.goto('https://www.thelog.co.kr/stats/gameStats.do');
     }
 
-    
-
-    /* 로그인에 성공했을 때 */
     if (page.url() === 'https://www.thelog.co.kr/stats/gameStats.do') {
-        let date;
-
+        await page.waitForSelector('a[href="/stats/rank/GameRankDetail.do"]', { visible: true });
         await page.click('a[href="/stats/rank/GameRankDetail.do"]');
+        await page.waitForSelector('.gtab_wrap .g_tab.sample a[onclick="tabConfig.btnAll();"]', { visible: true });
         await page.click('.gtab_wrap .g_tab.sample a[onclick="tabConfig.btnAll();"]');
 
-        //input id targetDate의 value 값을 가져와서 . 을 제거한 후 date 변수에 저장
-        date = await page.evaluate(() => {
+        let date = await page.evaluate(() => {
             return document.getElementById('targetDate').value.replace(/\./g, '');
         });
+
         await page.goto(`https://www.thelog.co.kr/api/service/gameRank.do?page=1&targetDate=${date}&gameDataType=A&moreBtnOption=false`);
 
         const data = await page.evaluate(() => document.querySelector('pre').textContent);
-
         const jsonData = JSON.parse(data);
-        
         const gameRanks = jsonData.gameRanks.slice(0, 50);
 
-        const result = gameRanks.map((game) => {
+        const result = await Promise.all(gameRanks.map(async (game) => {
             return {
                 title: game.gameName,
                 rank: game.gameRank,
                 gameRankUpDown: game.gameRankUpDown,
                 shares: game.gameShares,
                 sharesUpDown: String(game.sharesUpDown),
-                sharesStatus: String(game.sharesUpDown).includes('-') ? 'down' : 'up',
-                useStoreCount: game.useStoreCount,
+                sharesStatus: sharesUpDownCondition(game.gameRankUpDown),
+                useStoreCount: game.useStoreCount
             };
-        });
+        }));
 
-        response.send(result);
-    } 
-}
+        await browser.close();
+        return result;
+    } else {
+        await browser.close();
+        return [];
+    }
+};
 
 app.get('/api/coupon/:resource', (req, res) => {
     let { resource } = req.params;
@@ -367,14 +358,30 @@ app.get('/api/chzzk/:info', (req, res) => {
     }
 });
 
-app.get('/api/ranking', (req, res) => {
-    getGameStatsData(res);
-});
+app.get('/api/games', async (req, res) => {
+    const pageNumber = parseInt(req.query.page, 10) || 1;
+    const pageSize = parseInt(req.query.size, 10) || 5;
 
-app.get('/api/game/image/:gameName', (req, res) => {
-    let { gameName } = req.params;
+    if (!dataCache.has('gameData')) {
+        console.log('Fetching new data...');
+        try {
+            const data = await getGameStatsData();
+            dataCache.set('gameData', data);
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Failed to fetch game data' });
+            return;
+        }
+    } else {
+        console.log('Using cached data...');
+    }
 
-    getGameImage(res, gameName);
+    const cachedData = dataCache.get('gameData');
+    const start = (pageNumber - 1) * pageSize;
+    const end = start + pageSize;
+    const paginatedData = cachedData.slice(start, end);
+
+    res.json(paginatedData);
 });
 
 module.exports = app;
