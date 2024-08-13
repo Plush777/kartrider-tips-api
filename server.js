@@ -6,6 +6,7 @@ const PORT = 8000;
 const cors = require('cors');
 const puppeteer = require('puppeteer');
 const LRU = require('lru-cache');
+require('dotenv').config()
 
 app.use(cors());
 
@@ -42,6 +43,57 @@ const UPDATE_URL = "https://kartdrift.nexon.com/kartdrift/ko/news/update/list";
 
 */
 const KART_LIVE_URL = `https://api.chzzk.naver.com/service/v1/search/lives?keyword=%EC%B9%B4%ED%8A%B8%EB%9D%BC%EC%9D%B4%EB%8D%94%20%EB%93%9C%EB%A6%AC%ED%94%84%ED%8A%B8`;
+
+const GAME_RANK_IMAGE_URL = 'https://openapi.naver.com/v1/search/image';
+
+const apiObject = {
+    chzzk: {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
+        },
+        params: {
+            chzzkParam: function (offset, size) {
+                return {
+                    offset: offset,
+                    size: size
+                }
+            }
+        }
+    },
+    naver: {
+        searchImage: {
+            headers: {
+                'Content-Type': 'application/xml',
+                'X-Naver-Client-Id': process.env.NEXT_PUBLIC_NAVER_CLIENT_ID,
+                'X-Naver-Client-Secret': process.env.NEXT_PUBLIC_NAVER_CLIENT_SECRET
+            },
+            params: {
+                searchImage: function (query, display, start, sort, filter) {
+                    return {
+                        query: query,
+                        display: display,
+                        start: start,
+                        sort: sort,
+                        filter: filter
+                    }
+                }
+            }
+        }
+    }
+}
+
+const getData = async (url, headers, params) => {
+    try { 
+        const response = await axios.get(url, {
+            headers: headers,
+            params: params
+        });
+
+        return response.data;
+    } catch (error) {
+        console.error(error);
+    }
+}
 
 const blockResource = (page) => {
     page.setRequestInterception(true);
@@ -203,9 +255,14 @@ const getHtml = async (url, resource, response, selector, condition) => {
     }
 };
 
-const getGameStatsData = async () => {
+const getGameStatsData = async (cursor = 1) => {
     const browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
+
+    const pageSize = 50;
+    const successUrl = 'https://www.thelog.co.kr/stats/gameStats.do';
+    const cursorPageUrl = 'https://www.thelog.co.kr/stats/rank/GameRealRank.do';
+    const cursorApiUrl = `https://www.thelog.co.kr/api/service/getRealTimeRank.do?page=${cursor}&sort=game_rank&sortOption=ASC&gameDataType=A`;
 
     blockResource(page);
 
@@ -229,48 +286,98 @@ const getGameStatsData = async () => {
         await page.click('input.btn_login');
         await page.waitForNavigation({ waitUntil: 'networkidle0' });
 
-        if (page.url() !== 'https://www.thelog.co.kr/stats/gameStats.do') {
+        if (page.url() !== successUrl) {
             console.error('로그인 실패');
             await browser.close();
             return [];
         }
     } else {
-        await page.goto('https://www.thelog.co.kr/stats/gameStats.do');
+        await page.goto(cursorPageUrl);
     }
 
-    if (page.url() === 'https://www.thelog.co.kr/stats/gameStats.do') {
-        await page.waitForSelector('a[href="/stats/rank/GameRankDetail.do"]', { visible: true });
-        await page.click('a[href="/stats/rank/GameRankDetail.do"]');
-        await page.waitForSelector('.gtab_wrap .g_tab.sample a[onclick="tabConfig.btnAll();"]', { visible: true });
-        await page.click('.gtab_wrap .g_tab.sample a[onclick="tabConfig.btnAll();"]');
+    if (page.url() === successUrl) {
+        console.log('로그인 성공');
 
-        let date = await page.evaluate(() => {
-            return document.getElementById('targetDate').value.replace(/\./g, '');
-        });
+        const data = await page.evaluate(async (cursorApiUrl) => {
+            const response = await fetch(cursorApiUrl);
+            if (!response.ok) console.error('API 호출 실패');
+            return await response.json();
+        }, cursorApiUrl);
 
-        await page.goto(`https://www.thelog.co.kr/api/service/gameRank.do?page=1&targetDate=${date}&gameDataType=A&moreBtnOption=false`);
+        const gameDataArray = data.realTimeRank;
 
-        const data = await page.evaluate(() => document.querySelector('pre').textContent);
-        const jsonData = JSON.parse(data);
-        const gameRanks = jsonData.gameRanks.slice(0, 50);
-
-        const result = await Promise.all(gameRanks.map(async (game) => {
+        const cursorNumber = Number(cursor);
+        const nextCursor = gameDataArray.length < pageSize ? null : cursorNumber + 1;
+        const searchImageApiHeader = apiObject.naver.searchImage.headers;
+        
+        const result = gameDataArray.map((game) => {
             return {
                 title: game.gameName,
                 rank: game.gameRank,
                 gameRankUpDown: game.gameRankUpDown,
                 shares: game.gameShares,
-                sharesUpDown: String(game.sharesUpDown),
                 sharesStatus: sharesUpDownCondition(game.gameRankUpDown),
-                useStoreCount: game.useStoreCount
+                useStoreCount: game.useStoreCount,
+                targetDate: game.targetDate
             };
-        }));
+        });
+        
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        async function fetchImagesForGame(game) {
+            const searchImageApiParams = apiObject.naver.searchImage.params.searchImage(
+                `${game.title}`, 1, 1, 'sim', 'small'
+            );
+            return getData(GAME_RANK_IMAGE_URL, searchImageApiHeader, searchImageApiParams);
+        }
+        
+        async function fetchImagesInBatches(games, batchSize = 10, delay = 1000) {
+            const results = [];
+        
+            // 배치 단위로 요청 처리
+            for (let i = 0; i < games.length; i += batchSize) {
+                const batch = games.slice(i, i + batchSize);
+                
+                // 현재 배치의 요청을 모두 처리하고 결과를 수집
+                const batchResults = await Promise.all(batch.map(game => fetchImagesForGame(game)));
+                
+                // 결과를 최종 결과 배열에 추가
+                results.push(...batchResults);
+                
+                // 다음 배치 처리 전에 지연 추가
+                if (i + batchSize < games.length) {
+                    await sleep(delay);
+                }
+            }
+        
+            return results;
+        }
+        
+        // 배치 처리 호출
+        const fetchImageResult = await fetchImagesInBatches(result);
+
+        // console.log(fetchImageResult);
+        
+        const imageResult = fetchImageResult.map((game, index) => {
+            return {
+                title: result[index].title,
+                rank: result[index].rank,
+                gameRankUpDown: result[index].gameRankUpDown,
+                shares: result[index].shares,
+                sharesStatus: result[index].sharesStatus,
+                useStoreCount: result[index].useStoreCount,
+                targetDate: result[index].targetDate,
+                img: game.items[0].thumbnail
+            }
+        });
+
+        // console.log(imageResult)
 
         await browser.close();
-        return result;
+        return { result: imageResult, nextCursor };
     } else {
         await browser.close();
-        return [];
+        return { result: [], nextCursor: null };
     }
 };
 
@@ -313,34 +420,16 @@ app.get('/api/kart', (req, res) => {
     getHtml(KART_LIST_URL, null, res, ".MsoTableGrid[width]", "kart");
 });
 
-const getChzzk = async (url, response) => {
-    const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
-    }
-
-    try { 
-        const data = await axios.get(url, {
-            headers: headers
-        });
-
-        response.send(data.data);
-    } catch (error) {
-        console.error(error);
-        response.status(404).json({ error: 'Not Found' });
-    }
-}
-
 app.get('/api/chzzk/:info', (req, res) => {
     let { info } = req.params;
-
-    const chzzkParam = (offset, size) => {
-        return `&offset=${offset}&size=${size}`;
-    }
 
     switch (info) { 
         case "live": 
             let offset = 0;
             let size = 10;    
+
+            const headers = apiObject.chzzk.headers;
+            const params = apiObject.chzzk.params.chzzkParam(offset, size);
         
             if (req.query.offset) {
                 offset = req.query.offset;
@@ -350,7 +439,7 @@ app.get('/api/chzzk/:info', (req, res) => {
                 size = req.query.size;
             }
 
-            getChzzk(`${KART_LIVE_URL}${chzzkParam(offset, size)}`, res);
+            getData(headers, params, `${KART_LIVE_URL}`, res);
             break;
         default:
             res.status(404).json({ error: 'Not Found' });
@@ -359,29 +448,16 @@ app.get('/api/chzzk/:info', (req, res) => {
 });
 
 app.get('/api/games', async (req, res) => {
-    const pageNumber = parseInt(req.query.page, 10) || 1;
-    const pageSize = parseInt(req.query.size, 10) || 5;
-
-    if (!dataCache.has('gameData')) {
+    const cursor = req.query.cursor || null;
+        
+    try {
         console.log('Fetching new data...');
-        try {
-            const data = await getGameStatsData();
-            dataCache.set('gameData', data);
-        } catch (error) {
-            console.error(error);
-            res.status(500).json({ error: 'Failed to fetch game data' });
-            return;
-        }
-    } else {
-        console.log('Using cached data...');
+
+        const { result, nextCursor } = await getGameStatsData(cursor);
+        res.json({ result, nextCursor});
+    } catch (error) {
+        console.error(error);
     }
-
-    const cachedData = dataCache.get('gameData');
-    const start = (pageNumber - 1) * pageSize;
-    const end = start + pageSize;
-    const paginatedData = cachedData.slice(start, end);
-
-    res.json(paginatedData);
 });
 
 module.exports = app;
