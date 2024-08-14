@@ -14,7 +14,10 @@ app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
 
-const dataCache = new LRU({ max: 1, ttl: 1000 * 60 * 60 }); // 게임 데이터 캐시, 1시간 TTL
+const dataCache = new LRU({ 
+    max: 350, 
+    ttl: 7 * 24 * 60 * 60 * 1000 
+}); 
 
 /* 공지사항에서 제목 검색 => 쿠폰에 대한 데이터 */
 const NEWS_COUPON_URL = "https://kartdrift.nexon.com/kartdrift/ko/news/announcement/list?searchKeywordType=THREAD_TITLE&keywords=%EC%BF%A0%ED%8F%B0";
@@ -255,6 +258,20 @@ const getHtml = async (url, resource, response, selector, condition) => {
     }
 };
 
+const sleep = (ms) => {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+const validImageFn = async (url) => {
+    try {
+        const response = await fetch(url, { method: 'HEAD' });
+        return response.ok && response.headers.get('Content-Type').startsWith('image/');
+    } catch (error) {
+        console.error('이미지 유효성 검사', error);
+        return false;
+    }
+}
+
 const getGameStatsData = async (cursor = 1) => {
     const browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
@@ -309,26 +326,25 @@ const getGameStatsData = async (cursor = 1) => {
         const cursorNumber = Number(cursor);
         const nextCursor = gameDataArray.length < pageSize ? null : cursorNumber + 1;
         const searchImageApiHeader = apiObject.naver.searchImage.headers;
-        
-        const result = gameDataArray.map((game) => {
-            return {
-                title: game.gameName,
-                rank: game.gameRank,
-                gameRankUpDown: game.gameRankUpDown,
-                shares: game.gameShares,
-                sharesStatus: sharesUpDownCondition(game.gameRankUpDown),
-                useStoreCount: game.useStoreCount,
-                targetDate: game.targetDate
-            };
-        });
-        
-        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
         async function fetchImagesForGame(game) {
+            const cachedImage = dataCache.get(game.gameName);
+            // console.log(game);
+
+            if (cachedImage) return cachedImage;
+
             const searchImageApiParams = apiObject.naver.searchImage.params.searchImage(
-                `${game.title}`, 1, 1, 'sim', 'small'
+                `${game.gameName}`, 50, 1, 'sim', 'small'
             );
-            return getData(GAME_RANK_IMAGE_URL, searchImageApiHeader, searchImageApiParams);
+
+            const fetchImageResult = await getData(GAME_RANK_IMAGE_URL, searchImageApiHeader, searchImageApiParams);
+
+            if (fetchImageResult && fetchImageResult.items && fetchImageResult.items.length > 0) {
+                dataCache.set(game.gameName, fetchImageResult);
+                return fetchImageResult;
+            } else {
+                return null; // 유효하지 않은 경우 null 반환
+            }
         }
         
         async function fetchImagesInBatches(games, batchSize = 10, delay = 1000) {
@@ -352,32 +368,33 @@ const getGameStatsData = async (cursor = 1) => {
         
             return results;
         }
-        
-        // 배치 처리 호출
-        const fetchImageResult = await fetchImagesInBatches(result);
 
+        const fetchImageResult = await fetchImagesInBatches(gameDataArray);
         // console.log(fetchImageResult);
         
-        const imageResult = fetchImageResult.map((game, index) => {
+        const result = await Promise.all(gameDataArray.map(async (_, index) => {
+            const arrayIndex = gameDataArray[index];
+            const imageResult = fetchImageResult[index].items[index] && fetchImageResult[index].items[index].thumbnail;
+            const vaildImage = imageResult ? await validImageFn(imageResult) : false;
+           
             return {
-                title: result[index].title,
-                rank: result[index].rank,
-                gameRankUpDown: result[index].gameRankUpDown,
-                shares: result[index].shares,
-                sharesStatus: result[index].sharesStatus,
-                useStoreCount: result[index].useStoreCount,
-                targetDate: result[index].targetDate,
-                img: game.items[0].thumbnail
+                title: arrayIndex.gameName,
+                rank: arrayIndex.gameRank,
+                gameRankUpDown: arrayIndex.gameRankUpDown,
+                shares: arrayIndex.gameShares,
+                sharesStatus: sharesUpDownCondition(arrayIndex.gameRankUpDown),
+                useStoreCount: arrayIndex.useStoreCount,
+                targetDate: arrayIndex.targetDate,
+                img: vaildImage ? imageResult : null
             }
-        });
+        }));
 
-        // console.log(imageResult)
-
+        // console.log(result)
         await browser.close();
-        return { result: imageResult, nextCursor };
+        return { result: result, nextCursor };
     } else {
         await browser.close();
-        return { result: [], nextCursor: null };
+        return { result: [], images: null, nextCursor: null };
     }
 };
 
