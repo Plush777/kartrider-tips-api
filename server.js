@@ -84,8 +84,6 @@ const apiObject = {
     }
 }
 
-const naverApiHeader = apiObject.naver.headers;
-
 const getData = async (url, headers, params) => {
     try {
         const response = await axios.get(url, {
@@ -129,7 +127,6 @@ const getHtml = async (url, resource, response, selector, condition) => {
 
         if (condition === 'kartdrift') {
             $bodyList.each(function (i, item) {
-
                 if (i >= 4) return false;
 
                 switch (resource) {
@@ -139,7 +136,6 @@ const getHtml = async (url, resource, response, selector, condition) => {
                             date: $(this).find('.info .date').text(),
                             view: $(this).find('.view').text()
                         }
-
                         break;
                     case "guide":
                     case "cm_event":
@@ -156,7 +152,6 @@ const getHtml = async (url, resource, response, selector, condition) => {
                     default:
                         break;
                 }
-
                 list[i] = object;
             });
         } else if (condition === 'kart') {
@@ -176,7 +171,6 @@ const getHtml = async (url, resource, response, selector, condition) => {
                 }
 
                 const extractedItems = extractItemsFromArray(kartArrayJoin);
-
                 const kartTypeSelector = 'tr td[style*="background-color:#9a68f4"] span[style*="letter-spacing"], tr td[style*="background-color: rgb(154, 104, 244)"] span[style*="letter-spacing"], tr td[style*="background-color:#ee6060"] span[style*="letter-spacing"], tr td[style*="background-color:#6b72fb"] span[style*="letter-spacing"]'
                 /* 
                     240630 주의사항 추가 
@@ -238,7 +232,6 @@ const getHtml = async (url, resource, response, selector, condition) => {
                     imgs: imgArray,
                     stats: statResultArray
                 }
-
                 list[i] = object;
             });
         } else if (condition === 'ranking') {
@@ -396,6 +389,7 @@ async function fetchImagesInBatches(games, batchSize = 10, delay = 800) {
 
     return results;
 }
+
 
 app.get('/api/article/:resource', (req, res) => {
     let { resource } = req.params;
