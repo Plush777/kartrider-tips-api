@@ -84,6 +84,8 @@ const apiObject = {
     }
 }
 
+const naverApiHeader = apiObject.naver.headers;
+
 const getData = async (url, headers, params) => {
     try {
         const response = await axios.get(url, {
@@ -462,10 +464,10 @@ app.get('/api/games/images', async (req, res) => {
     try {
         console.log('Fetching new images...');
 
-        const { result } = await getGameStatsData(cursor);
+        const { result, nextCursor } = await getGameStatsData(cursor);
         const images = await fetchImagesInBatches(result);
 
-        res.json(images);
+        res.json({ images, nextCursor });
     } catch (error) {
         console.error(error);
     }
