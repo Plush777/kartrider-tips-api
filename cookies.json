@@ -1,0 +1,44 @@
+[
+  {
+    "name": "JSESSIONID",
+    "value": "0A61F5F3FE924E5C732C84061952E109.s1_node3",
+    "domain": "www.thelog.co.kr",
+    "path": "/",
+    "expires": -1,
+    "size": 51,
+    "httpOnly": true,
+    "secure": true,
+    "session": true,
+    "priority": "Medium",
+    "sameParty": false,
+    "sourceScheme": "Secure"
+  },
+  {
+    "name": "NW_THELOG_CERT",
+    "value": "bc37a17dea911dab691b81981b3119bc6dd9a3641af1c3d12ae0aa01cfd040da999f9d0b2c7f6b484815668e924a80be9ae5a48830640132f6bd6747d1b40720ec8787dcaf852ebe3e5312b24265a347d062f3fa6a65caac434eb9c60c1d27128ee5ead706ccd8f34ed3d8da5c3f5ea5946cd7d9df6be03ae3d279106ec935192cd2cd831dd66ea737f0a41a56ad9806fdc21038cf01b8144f383a59731ec5e168ce8444189037a343634ce745ad4a9509cdea9c0ebedec6fc62697a7d01416c5ba3601b2eb16374062ad9bb1881ccf3fcaca354eda5483d105444078a8280a0d7a7bd151a02aa35087f2d360627b32b9f1dfea3e1243a280fc2373d141cdcd70c43c65de25222f5648f9bb32bc521ec6e50e3b638a12328a9cefebc6a64d44c70c6fabee117b3ecdfe69abbc0da04b76f73750bdd87a45fefe01f6a70c8904f545e5b3ebf9df08a15723e2bc6fe909090a9bec26fd766f8c9a4e1c6121ab8f2bc37919fcddea202897b7d6b98303978b2b23cce95a1824b46614ba1ffe34f971023d4c89a7dba1885503db572d944243ecc77688367c9722cdec14d68de2e8abaebaa3bb4fdd0486986f97dae4bad56d15f3bc7a844b77ab0f6a882b4478c1c",
+    "domain": ".thelog.co.kr",
+    "path": "/",
+    "expires": -1,
+    "size": 910,
+    "httpOnly": false,
+    "secure": false,
+    "session": true,
+    "priority": "Medium",
+    "sameParty": false,
+    "sourceScheme": "Secure"
+  },
+  {
+    "name": "thelog_setting",
+    "value": "S",
+    "domain": "www.thelog.co.kr",
+    "path": "/",
+    "expires": -1,
+    "size": 15,
+    "httpOnly": false,
+    "secure": false,
+    "session": true,
+    "priority": "Medium",
+    "sameParty": false,
+    "sourceScheme": "Secure"
+  }
+]

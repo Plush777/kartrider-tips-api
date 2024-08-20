@@ -6,6 +6,7 @@ const PORT = 8000;
 const cors = require('cors');
 const puppeteer = require('puppeteer');
 const LRU = require('lru-cache');
+const fs = require('fs');
 require('dotenv').config()
 
 app.use(cors());
@@ -85,6 +86,17 @@ const apiObject = {
 }
 
 const naverApiHeader = apiObject.naver.headers;
+
+async function isImageUrlValid(url) {
+    try {
+        const response = await fetch(url, { method: 'HEAD' });
+        
+        return response.ok && response.headers.get('content-type')?.startsWith('image/');
+    } catch (error) {
+        console.error('Error checking image URL:', error);
+        return false;
+    }
+}
 
 const getData = async (url, headers, params) => {
     try {
@@ -261,91 +273,103 @@ const sleep = (ms) => {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const validImageFn = async (url) => {
-    try {
-        const response = await fetch(url, { method: 'HEAD' });
-        return response.ok && response.headers.get('Content-Type').startsWith('image/');
-    } catch (error) {
-        console.error('이미지 유효성 검사', error);
-        return false;
-    }
-}
-
 const getGameStatsData = async (cursor = 1) => {
-    const browser = await puppeteer.launch({ headless: true });
+    const browser = await puppeteer.launch({ 
+        headless: true,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--disable-gpu',
+            '--window-size=1920x1080'
+        ]
+    });
     const page = await browser.newPage();
 
     const pageSize = 50;
+    const loginUrl = 'https://www.thelog.co.kr/member/loginForm.do?returnUrl=http://www.thelog.co.kr/stats/gameStats.do';
     const successUrl = 'https://www.thelog.co.kr/stats/gameStats.do';
-    const cursorPageUrl = 'https://www.thelog.co.kr/stats/rank/GameRealRank.do';
     const cursorApiUrl = `https://www.thelog.co.kr/api/service/getRealTimeRank.do?page=${cursor}&sort=game_rank&sortOption=ASC&gameDataType=A`;
 
     blockResource(page);
 
-    const myId = process.env.THE_LOG_MY_ID;
-    const myPw = process.env.THE_LOG_MY_PASSWORD;
+    const cookiesFilePath = './cookies.json';
 
-    await page.goto('https://www.thelog.co.kr/index.do');
+    if (fs.existsSync(cookiesFilePath)) {
+        const cookieJson = fs.readFileSync(cookiesFilePath, 'utf-8');
+        const cookies = JSON.parse(cookieJson);
+        await page.setCookie(...cookies);
 
-    const isLoggedIn = await page.evaluate(() => {
-        return !!document.querySelector('.gnb_home .logout_btn');
-    });
+        console.log('쿠키가 존재하므로 로그인 없이 이동');
+        await page.goto(successUrl);
+    } else {
+        console.log('쿠키가 없으므로 로그인 시도');
 
-    if (!isLoggedIn) {
-        await page.click('.login_btn');
-        await page.waitForSelector('#loginId', { visible: true });
-        await page.focus('#loginId');
-        await page.keyboard.type(myId);
-        await page.focus('#loginPasswd');
-        await page.keyboard.type(myPw);
+        const myId = process.env.THE_LOG_MY_ID;
+        const myPw = process.env.THE_LOG_MY_PASSWORD;
 
-        await page.click('input.btn_login');
-        await page.waitForNavigation({ waitUntil: 'networkidle0' });
+        await page.goto(loginUrl);
+        await page.waitForSelector('#loginId');
+        await page.type('#loginId', myId);
+        await page.type('#loginPasswd', myPw);
+
+        await Promise.all([
+            page.click('input.btn_login'),
+            page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+        ]);
 
         if (page.url() !== successUrl) {
             console.error('로그인 실패');
             await browser.close();
             return [];
         }
-    } else {
-        await page.goto(cursorPageUrl);
+
+        console.log('로그인 성공 후 쿠키 저장');
+        const cookies = await page.cookies();
+        fs.writeFileSync(cookiesFilePath, JSON.stringify(cookies, null, 2));
+
+        await page.goto(successUrl);
     }
 
-    if (page.url() === successUrl) {
-        console.log('로그인 성공');
-
-        const data = await page.evaluate(async (cursorApiUrl) => {
+    const data = await page.evaluate(async (cursorApiUrl) => {
+        try {
             const response = await fetch(cursorApiUrl);
-            if (!response.ok) console.error('API 호출 실패');
-            return await response.json();
-        }, cursorApiUrl);
-
-        const gameDataArray = data.realTimeRank;
-
-        const cursorNumber = Number(cursor);
-        const nextCursor = gameDataArray.length < pageSize ? null : cursorNumber + 1;
-
-        const result = gameDataArray.map((_, index) => {
-            const arrayIndex = gameDataArray[index];
-
-            return {
-                title: arrayIndex.gameName,
-                rank: arrayIndex.gameRank,
-                gameRankUpDown: arrayIndex.gameRankUpDown,
-                shares: arrayIndex.gameShares,
-                sharesStatus: sharesUpDownCondition(arrayIndex.gameRankUpDown),
-                useStoreCount: arrayIndex.useStoreCount,
-                targetDate: arrayIndex.targetDate
+            
+            if (!response.ok) {
+                console.error('API 호출 실패', response.status, response.statusText);
+                return null;
             }
-        });
+    
+            const data = await response.json();
 
-        // console.log(result)
-        await browser.close();
-        return { result, nextCursor };
-    } else {
-        await browser.close();
-        return [];
-    }
+            return data;
+        } catch (error) {
+            console.error('Fetch operation failed:', error);
+            return null; 
+        }
+    }, cursorApiUrl)
+
+    const gameDataArray = data && data.realTimeRank;
+
+    const cursorNumber = Number(cursor);
+    const nextCursor = gameDataArray.length < pageSize ? null : cursorNumber + 1;
+
+    const result = gameDataArray.map((_, index) => {
+        const arrayIndex = gameDataArray[index];
+
+        return {
+            title: arrayIndex.gameName,
+            rank: arrayIndex.gameRank,
+            gameRankUpDown: arrayIndex.gameRankUpDown,
+            shares: arrayIndex.gameShares,
+            sharesStatus: sharesUpDownCondition(arrayIndex.gameRankUpDown),
+            useStoreCount: arrayIndex.useStoreCount,
+            targetDate: arrayIndex.targetDate
+        }
+    });
+    await browser.close();
+    return { result, nextCursor };
 };
 
 async function fetchImagesForGame(game) {
@@ -354,19 +378,33 @@ async function fetchImagesForGame(game) {
 
     if (cachedImage) return cachedImage;
 
-    const searchImageApiParams = apiObject.naver.search.params.search(
-        `${game.title}`, 1, 1, 'sim', 'small'
-    );
+    try {
+        const searchImageApiParams = apiObject.naver.search.params.search(
+            `${game.title}`, 1, 1, 'sim', 'small'
+        );
+    
+        const fetchImageResult = await getData(GAME_RANK_IMAGE_URL, naverApiHeader, searchImageApiParams);
+        console.log(fetchImageResult);
 
-    const fetchImageResult = await getData(GAME_RANK_IMAGE_URL, naverApiHeader, searchImageApiParams);
+        if (fetchImageResult && fetchImageResult.items && fetchImageResult.items.length > 0) {
+            /* 받아온 데이터에서 thumbnail url만 추출 후 해당 URL이 유효한지 검사 후 
+            데이터 구조에 맞게 결과를 반환합니다. */
+            const imageUrls = fetchImageResult.items.map(item => item.thumbnail);
 
-    console.log(fetchImageResult);
-
-    if (fetchImageResult && fetchImageResult.items && fetchImageResult.items.length > 0) {
-        dataCache.set(game.title, fetchImageResult);
-        return fetchImageResult;
-    } else {
-        return null; // 유효하지 않은 경우 null 반환
+            /* URL이 유효하지 않으면 null을 반환합니다. */
+            const validatedImageUrls = await Promise.all(
+                imageUrls.map(async url => (await isImageUrlValid(url)) ? url : null)
+            );
+            
+            const result = { ...fetchImageResult, items: validatedImageUrls.map(url => ({ thumbnail: url })) };
+            dataCache.set(game.title, result);
+            return result;
+        } else {
+            return null; 
+        }
+    } catch (error) {
+        console.error('Error fetching images for game:', error);
+        return null; 
     }
 }
 
@@ -380,8 +418,8 @@ async function fetchImagesInBatches(games, batchSize = 10, delay = 800) {
         // 현재 배치의 요청을 모두 처리하고 결과를 수집
         const batchResults = await Promise.all(batch.map(game => fetchImagesForGame(game)));
 
-        // 결과를 최종 결과 배열에 추가
-        results.push(...batchResults);
+        // 결과를 최종 결과 배열에 추가 (null 제외)
+        results.push(...batchResults.filter(result => result !== null));
 
         // 다음 배치 처리 전에 지연 추가
         if (i + batchSize < games.length) {
@@ -445,39 +483,47 @@ app.get('/api/chzzk/:info', async (req, res) => {
     }
 });
 
-app.get('/api/games', async (req, res) => {
+app.get('/api/games/:source', async (req, res) => {
+    let { source } = req.params;
     const cursor = req.query.cursor || null;
 
     try {
-        console.log('Fetching new data...');
+        switch (source) {
+            case "ranking": 
+                console.log('Fetching new data...');
+        
+                const { result, nextCursor } = await getGameStatsData(cursor);
+        
+                req.app.locals.cachedGameData = { result, nextCursor };
+                res.json({ result, nextCursor });
+    
+                break;
+            case "images":
+                console.log('Fetching new images...');
+        
+                const cachedData = req.app.locals.cachedGameData || await getGameStatsData(cursor);
+                const validatedImages = await fetchImagesInBatches(cachedData.result);
 
-        const { result, nextCursor } = await getGameStatsData(cursor);
-        res.json({ result, nextCursor });
+                console.log(validatedImages)
+        
+                res.json({ images: validatedImages, nextCursor: cachedData.nextCursor });
+    
+                break;
+            case "news":
+                const searchParams = apiObject.naver.search.params.search('카트라이더 드리프트', 4, 1, 'sim');
+                const news = await getData(NEWS_URL, naverApiHeader, searchParams);
+    
+                res.json(news);
+   
+                break;
+            default:
+                res.status(404).json({ error: 'Not Found' });
+                break;
+        }
     } catch (error) {
         console.error(error);
+        res.status(500).json({ error: '요청 처리 도중 오류가 발생했습니다.' });
     }
-});
-
-app.get('/api/games/images', async (req, res) => {
-    const cursor = req.query.cursor || null;
-
-    try {
-        console.log('Fetching new images...');
-
-        const { result, nextCursor } = await getGameStatsData(cursor);
-        const images = await fetchImagesInBatches(result);
-
-        res.json({ images, nextCursor });
-    } catch (error) {
-        console.error(error);
-    }
-});
-
-app.get('/api/games/news', async (req, res) => {
-    const searchParams = apiObject.naver.search.params.search('카트라이더 드리프트', 4, 1, 'sim');
-    const news = await getData(NEWS_URL, naverApiHeader, searchParams);
-
-    res.json(news);
 });
 
 module.exports = app;
