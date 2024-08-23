@@ -3,4 +3,4 @@
 # Local Netlify folder
 .netlify
 # get cookie log file
-cookies.json
+/cookies.json
