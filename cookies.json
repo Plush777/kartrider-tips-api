@@ -1,21 +1,7 @@
 [
   {
-    "name": "JSESSIONID",
-    "value": "B97EA51AF37F0D525CB32A38825742D8.s1_node3",
-    "domain": "www.thelog.co.kr",
-    "path": "/",
-    "expires": -1,
-    "size": 51,
-    "httpOnly": true,
-    "secure": true,
-    "session": true,
-    "priority": "Medium",
-    "sameParty": false,
-    "sourceScheme": "Secure"
-  },
-  {
     "name": "NW_THELOG_CERT",
-    "value": "bc37a17dea911dab691b81981b3119bc6dd9a3641af1c3d12ae0aa01cfd040da999f9d0b2c7f6b484815668e924a80be9ae5a48830640132f6bd6747d1b40720ec8787dcaf852ebe3e5312b24265a347d062f3fa6a65caac434eb9c60c1d27128ee5ead706ccd8f34ed3d8da5c3f5ea5946cd7d9df6be03ae3d279106ec935192cd2cd831dd66ea737f0a41a56ad9806fdc21038cf01b8144f383a59731ec5e168ce8444189037a343634ce745ad4a9509cdea9c0ebedec6fc62697a7d01416c18b914668c226c52d954bc5302a4760e7403aeb709fc6b700a1c8b86f27eb60400cd644248959cd5b5226213fe71953a729aafb50c5b1a3ddce64dce6d56693bd6215d4ee40330214b95703cfd79ac96e41aec4a8cda55c6ec4110c253feeabba0aa357850092fadd2290b14669f48a47c092645fae4fd4a7bcf4add8c468ef3bc050d9c21729fe0554a508e6587182550edde7f7e42a05f8c36e390020e09bdd46961df14b2473518aab5845c0e2b9dc3e56614c5bd5a797a35d847bbe108c759ca166c5fd87df010c105b2b0897e7f5d30a8fd9b44a00dcb40983d7d54b96b0206ae723a64580a318c2250cd2da39d6311f3388ced2c3aa76ef964545223b8",
+    "value": "bc37a17dea911dab691b81981b3119bc6dd9a3641af1c3d12ae0aa01cfd040da999f9d0b2c7f6b484815668e924a80be9ae5a48830640132f6bd6747d1b40720ec8787dcaf852ebe3e5312b24265a347d062f3fa6a65caac434eb9c60c1d27128ee5ead706ccd8f34ed3d8da5c3f5ea5946cd7d9df6be03ae3d279106ec935192cd2cd831dd66ea737f0a41a56ad9806fdc21038cf01b8144f383a59731ec5e168ce8444189037a343634ce745ad4a9509cdea9c0ebedec6fc62697a7d01416c3fd63de853d946f7fe274041db8be535795843f02cde3324a97acc052fb951fc433992f744cff29c6e24c9b62b3b01caae5089cf6394e943c6064aa76fb238051e73efe3cc5adbb12f3e7cf8bfa0c8f69d908145a3459af9d88bbd5dd8d82fff7ecab17326cab542504b1bc66689c2423a42e5df3facaac2116ea24a943c15e399afac4313e65ad7dfe4fc756e22b80276f204707b7223078aeb8b075c45a17d520ee3e8a32032e3f2f27a80676b7bb1b39ca9445306396c02026ec2648798e912f34bad541c6b93c77f3dd5d3fd95fa221c39e226a1391aca53a0f4eed9bf0d8b452d8b1246cc24ba070da9bcd364f2d7a9811a547f885d6ef2a3b84f888630",
     "domain": ".thelog.co.kr",
     "path": "/",
     "expires": -1,
@@ -36,6 +22,20 @@
     "size": 15,
     "httpOnly": false,
     "secure": false,
+    "session": true,
+    "priority": "Medium",
+    "sameParty": false,
+    "sourceScheme": "Secure"
+  },
+  {
+    "name": "JSESSIONID",
+    "value": "84E675E1FE402415B7B28E5C76AB6599.s1_node3",
+    "domain": "www.thelog.co.kr",
+    "path": "/",
+    "expires": -1,
+    "size": 51,
+    "httpOnly": true,
+    "secure": true,
     "session": true,
     "priority": "Medium",
     "sameParty": false,

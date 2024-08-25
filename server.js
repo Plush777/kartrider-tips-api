@@ -90,7 +90,7 @@ const naverApiHeader = apiObject.naver.headers;
 async function isImageUrlValid(url) {
     try {
         const response = await fetch(url, { method: 'HEAD' });
-        
+
         return response.ok && response.headers.get('content-type')?.startsWith('image/');
     } catch (error) {
         console.error('Error checking image URL:', error);
@@ -274,7 +274,7 @@ const sleep = (ms) => {
 }
 
 const getGameStatsData = async (cursor = 1) => {
-    const browser = await puppeteer.launch({ 
+    const browser = await puppeteer.launch({
         headless: true,
         args: [
             '--no-sandbox',
@@ -296,16 +296,7 @@ const getGameStatsData = async (cursor = 1) => {
 
     const cookiesFilePath = './cookies.json';
 
-    if (fs.existsSync(cookiesFilePath)) {
-        const cookieJson = fs.readFileSync(cookiesFilePath, 'utf-8');
-        const cookies = JSON.parse(cookieJson);
-        await page.setCookie(...cookies);
-
-        console.log('쿠키가 존재하므로 로그인 없이 이동');
-        await page.goto(successUrl);
-    } else {
-        console.log('쿠키가 없으므로 로그인 시도');
-
+    const login = async () => {
         const myId = process.env.THE_LOG_MY_ID;
         const myPw = process.env.THE_LOG_MY_PASSWORD;
 
@@ -322,7 +313,7 @@ const getGameStatsData = async (cursor = 1) => {
         if (page.url() !== successUrl) {
             console.error('로그인 실패');
             await browser.close();
-            return [];
+            return false;
         }
 
         console.log('로그인 성공 후 쿠키 저장');
@@ -330,23 +321,42 @@ const getGameStatsData = async (cursor = 1) => {
         fs.writeFileSync(cookiesFilePath, JSON.stringify(cookies, null, 2));
 
         await page.goto(successUrl);
+    };
+
+    if (fs.existsSync(cookiesFilePath)) {
+        const cookieJson = fs.readFileSync(cookiesFilePath, 'utf-8');
+        const cookies = JSON.parse(cookieJson);
+        await page.setCookie(...cookies);
+
+        console.log('쿠키가 존재하므로 로그인 없이 이동');
+        await page.goto(successUrl);
+
+        if (page.url() === successUrl) {
+            console.log('쿠키를 통해 로그인 성공');
+        } else {
+            console.log('쿠키 만료, 로그인 재시도');
+            await login();
+        }
+    } else {
+        console.log('쿠키가 없으므로 로그인 시도');
+        await login();
     }
 
     const data = await page.evaluate(async (cursorApiUrl) => {
         try {
             const response = await fetch(cursorApiUrl);
-            
+
             if (!response.ok) {
                 console.error('API 호출 실패', response.status, response.statusText);
                 return null;
             }
-    
+
             const data = await response.json();
 
             return data;
         } catch (error) {
             console.error('Fetch operation failed:', error);
-            return null; 
+            return null;
         }
     }, cursorApiUrl)
 
@@ -373,7 +383,8 @@ const getGameStatsData = async (cursor = 1) => {
 };
 
 async function fetchImagesForGame(game) {
-    const cachedImage = dataCache.get(game.title);
+    const cacheKey = `${game.title}_${game.rank}`;
+    const cachedImage = dataCache.get(cacheKey);
     // console.log(game);
 
     if (cachedImage) return cachedImage;
@@ -382,9 +393,8 @@ async function fetchImagesForGame(game) {
         const searchImageApiParams = apiObject.naver.search.params.search(
             `${game.title}`, 1, 1, 'sim', 'small'
         );
-    
+
         const fetchImageResult = await getData(GAME_RANK_IMAGE_URL, naverApiHeader, searchImageApiParams);
-        console.log(fetchImageResult);
 
         if (fetchImageResult && fetchImageResult.items && fetchImageResult.items.length > 0) {
             /* 받아온 데이터에서 thumbnail url만 추출 후 해당 URL이 유효한지 검사 후 
@@ -395,27 +405,32 @@ async function fetchImagesForGame(game) {
             const validatedImageUrls = await Promise.all(
                 imageUrls.map(async url => (await isImageUrlValid(url)) ? url : null)
             );
-            
-            const result = { ...fetchImageResult, items: validatedImageUrls.map(url => ({ thumbnail: url })) };
-            dataCache.set(game.title, result);
-            return result;
+
+            const validUrls = validatedImageUrls.filter(url => url !== null);
+
+            if (validUrls.length > 0) {
+                const result = { ...fetchImageResult, items: validUrls.map(url => ({ thumbnail: url })) };
+                dataCache.set(cacheKey, result);
+                return result;
+            } else {
+                console.log(`No valid image URLs found for game: ${game.title} on cursor: ${game.rank}`);
+                return null;
+            }
         } else {
-            return null; 
+            return null;
         }
     } catch (error) {
         console.error('Error fetching images for game:', error);
-        return null; 
+        return null;
     }
 }
 
 async function fetchImagesInBatches(games, batchSize = 10, delay = 800) {
     const results = [];
 
-    // 배치 단위로 요청 처리
     for (let i = 0; i < games.length; i += batchSize) {
         const batch = games.slice(i, i + batchSize);
 
-        // 현재 배치의 요청을 모두 처리하고 결과를 수집
         const batchResults = await Promise.all(batch.map(game => fetchImagesForGame(game)));
 
         // 결과를 최종 결과 배열에 추가 (null 제외)
@@ -489,32 +504,32 @@ app.get('/api/games/:source', async (req, res) => {
 
     try {
         switch (source) {
-            case "ranking": 
+            case "ranking":
                 console.log('Fetching new data...');
-        
+
                 const { result, nextCursor } = await getGameStatsData(cursor);
-        
+
                 req.app.locals.cachedGameData = { result, nextCursor };
                 res.json({ result, nextCursor });
-    
+
                 break;
             case "images":
                 console.log('Fetching new images...');
-        
+
                 const cachedData = req.app.locals.cachedGameData || await getGameStatsData(cursor);
                 const validatedImages = await fetchImagesInBatches(cachedData.result);
 
-                console.log(validatedImages)
-        
+                // console.log(validatedImages)
+
                 res.json({ images: validatedImages, nextCursor: cachedData.nextCursor });
-    
+
                 break;
             case "news":
                 const searchParams = apiObject.naver.search.params.search('카트라이더 드리프트', 4, 1, 'sim');
                 const news = await getData(NEWS_URL, naverApiHeader, searchParams);
-    
+
                 res.json(news);
-   
+
                 break;
             default:
                 res.status(404).json({ error: 'Not Found' });
